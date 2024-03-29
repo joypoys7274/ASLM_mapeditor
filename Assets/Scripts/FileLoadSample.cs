@@ -14,6 +14,7 @@ public class FileLoadSample : MonoBehaviour, IPointerDownHandler
 {
     // テキストアウトプット
     [SerializeField] private Text outputText;
+    [SerializeField] private Image outputImage;
 
     // 読み込んだテキスト
     private string _loadedText = "";
@@ -54,34 +55,60 @@ public class FileLoadSample : MonoBehaviour, IPointerDownHandler
     {
         // 拡張子フィルタ
         var extensions = new[] {
-            new ExtensionFilter("All Files", "*" ),
+            new ExtensionFilter("Image Files", "png", "jpg", "jpeg" ),
         };
 
         // ファイルダイアログを開く
         var paths = StandaloneFileBrowser.OpenFilePanel("Open File", "", extensions, false);
-        if (paths.Length > 0 && paths[0].Length > 0)
-        {
-
-            StartCoroutine(Load(new System.Uri(paths[0]).AbsoluteUri));
-
-        }
+        Load(paths[0]);
     }
 
 #endif
     // ファイル読み込み
-    private IEnumerator Load(string url)
+    private void Load(string path)
     {
-        var request = UnityWebRequest.Get(url);
+        byte[] readBinary = ReadPngFile(path);
 
-        var operation = request.SendWebRequest();
-        while (!operation.isDone)
+        int pos = 16; // 16バイトから開始
+
+        int width = 0;
+        for (int i = 0; i < 4; i++)
         {
-            yield return null;
+            width = width * 256 + readBinary[pos++];
         }
 
-        _loadedText = request.downloadHandler.text;
-        Debug.Log(_loadedText);
-        outputText.text = _loadedText;
+        int height = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            height = height * 256 + readBinary[pos++];
+        }
+
+        Texture2D texture = new Texture2D(width, height);
+        texture.LoadImage(readBinary);
+
+        Sprite createdSprite = Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0, 1), 1);
+        outputImage.sprite = createdSprite;
+    }
+
+    byte[] ReadPngFile(string path)
+    {
+        FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read);
+        BinaryReader bin = new BinaryReader(fileStream);
+        byte[] values = bin.ReadBytes((int)bin.BaseStream.Length);
+
+        bin.Close();
+
+        return values;
+    }
+
+    Texture ReadTexture(string path, int width, int height)
+    {
+        byte[] readBinary = ReadPngFile(path);
+
+        Texture2D texture = new Texture2D(width, height);
+        texture.LoadImage(readBinary);
+
+        return texture;
     }
 
 }
